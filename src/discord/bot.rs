@@ -1,7 +1,6 @@
 use chatgpt::prelude::*;
 use futures::StreamExt;
 use serenity::{async_trait, builder::EditMessage, model::channel::Message, prelude::*};
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::interval;
 
@@ -13,16 +12,15 @@ pub struct Handler {
 // The Handler struct is the event handler for the bot.
 impl Handler {
     pub async fn new(api_key: String) -> Result<Self> {
-        let config = ModelConfiguration {
-            engine: ChatGPTEngine::Gpt4,
-            temperature: 0.5,
-            top_p: 1.0,
-            max_tokens: None,
-            presence_penalty: 0.0,
-            frequency_penalty: 0.0,
-            reply_count: 1,
-            api_url: url::Url::from_str("https://api.openai.com/v1/chat/completions").unwrap(),
-            timeout: Duration::from_secs(10),
+        let config: ModelConfiguration = match ModelConfigurationBuilder::default()
+            .engine(ChatGPTEngine::Gpt4)
+            .build()
+        {
+            Ok(config) => config,
+            Err(e) => {
+                log::error!("Failed to build ModelConfiguration: {}", e);
+                ModelConfiguration::default()
+            }
         };
         let gpt_client = ChatGPT::new_with_config(api_key, config)?;
         Ok(Self { gpt_client })
