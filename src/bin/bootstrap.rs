@@ -18,7 +18,7 @@ async fn main() {
     // Get the OpenAI API key from the environment
     let gpt_api_key =
         env::var("OPENAI_API_KEY").expect("Expected a OPEN AI key in the environment");
-    // Create a new client with the discord token
+    // Set the intents for the bot
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES;
     // Create a new client with the discord token
     let mut client = Client::builder(&discord_token, intents)
@@ -27,6 +27,7 @@ async fn main() {
         .expect("Error creating client");
 
     // Start listening for events
+    println!("Bot is now running. Press Ctrl+C to stop.");
     if let Err(why) = client.start().await {
         log::error!("Client error: {:?}", why);
     }
