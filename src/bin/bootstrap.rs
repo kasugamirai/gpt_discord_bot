@@ -20,6 +20,7 @@ async fn main() {
         env::var("OPENAI_API_KEY").expect("Expected a OPEN AI key in the environment");
     // Set the intents for the bot
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES;
+
     // Create a new client with the discord token
     let mut client = Client::builder(&discord_token, intents)
         .event_handler(Handler::new(gpt_api_key).await.unwrap())

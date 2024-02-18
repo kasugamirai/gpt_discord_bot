@@ -15,6 +15,8 @@ impl Handler {
     pub async fn new(api_key: String) -> Result<Self> {
         let config: ModelConfiguration = ModelConfigurationBuilder::default()
             .engine(ChatGPTEngine::Gpt4)
+            // Set the timeout for the API request
+            .timeout(Duration::from_secs(50))
             .build()
             .unwrap_or_else(|e| {
                 log::error!("Failed to build ModelConfiguration: {}", e);
@@ -54,7 +56,7 @@ impl EventHandler for Handler {
             };
 
             let mut result = String::new();
-            let mut interval = interval(Duration::from_millis(1000));
+            let mut interval = interval(Duration::from_millis(1200));
 
             loop {
                 select! {
