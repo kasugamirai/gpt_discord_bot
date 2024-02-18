@@ -54,7 +54,7 @@ impl EventHandler for Handler {
             };
 
             let mut result = String::new();
-            let mut interval = interval(Duration::from_millis(800));
+            let mut interval = interval(Duration::from_millis(1000));
 
             loop {
                 select! {
