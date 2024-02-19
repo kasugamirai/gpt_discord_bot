@@ -5,7 +5,7 @@ use tokio;
 
 use dotenv;
 
-use gpt_discord_bot::discord::bot::Handler;
+use gpt_discord_bot::bot::Handler;
 
 #[tokio::main]
 async fn main() {
