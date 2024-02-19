@@ -1,5 +1,6 @@
 use serenity::{client::Client, prelude::*};
 use std::env;
+use std::path::Path;
 use tokio;
 
 use dotenv;
@@ -11,7 +12,9 @@ async fn main() {
     // Initialize the logger
     env_logger::init();
     // Load environment variables from .env file
-    dotenv::dotenv().expect("Failed to load .env file");
+    if Path::new(".env").exists() {
+        dotenv::dotenv().expect("Failed to load .env file");
+    }
     // Get the discord token from the environment
     let discord_token =
         env::var("DISCORD_TOKEN").expect("Expected a discord token in the environment");
