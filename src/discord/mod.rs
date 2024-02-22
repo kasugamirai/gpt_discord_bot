@@ -1,1 +1,2 @@
-pub mod bot;
+mod bot;
+pub use bot::Handler;
