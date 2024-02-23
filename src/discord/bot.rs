@@ -24,7 +24,7 @@ impl Handler {
         Ok(Self { gpt_client })
     }
 
-    async fn process_message(&self, ctx: Context, msg: Message) -> Option<String> {
+    async fn process_message(&self, msg: Message) -> Option<String> {
         if msg.author.bot || !msg.content.starts_with(".") {
             return None;
         }
@@ -57,7 +57,7 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if let Some(result) = self.process_message(ctx.clone(), msg.clone()).await {
+        if let Some(result) = self.process_message(msg.clone()).await {
             let processing_future = msg.channel_id.say(&ctx.http, "Processing...");
 
             match processing_future.await {
