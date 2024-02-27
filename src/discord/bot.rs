@@ -1,17 +1,29 @@
 use chatgpt::prelude::*;
 use futures::StreamExt;
-use serenity::client::{Context, EventHandler};
+use serenity::client::{Context, EventHandler as SerenityEventHandler};
 use serenity::{async_trait, builder::EditMessage, model::channel::Message};
 use std::time::Duration;
 use tokio::select;
 use tokio::time::interval;
 
+// Define a trait representing handler behavior
+pub trait ChatHandler {
+    // Create a new instance of the handler
+    fn new(api_key: String) -> Result<Self>
+    where
+        Self: Sized;
+
+    // Process an incoming message and return a response
+    fn process_message(&self, msg: Message) -> Option<String>;
+}
+
+// Handler struct implementing the ChatHandler trait
 pub struct Handler {
     pub gpt_client: ChatGPT,
 }
 
 impl Handler {
-    pub async fn new(api_key: String) -> Result<Self> {
+    pub async fn new(api_key: &String) -> Result<Self> {
         let config: ModelConfiguration = ModelConfigurationBuilder::default()
             .engine(ChatGPTEngine::Gpt4)
             .timeout(Duration::from_secs(50))
@@ -55,7 +67,7 @@ impl Handler {
 }
 
 #[async_trait]
-impl EventHandler for Handler {
+impl SerenityEventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if let Some(result) = self.process_message(msg.clone()).await {
             let processing_future = msg.channel_id.say(&ctx.http, "Processing...");

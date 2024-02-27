@@ -1,9 +1,6 @@
-use serenity::{client::Client, prelude::*};
+use serenity::prelude::*;
 use std::env;
 use std::path::Path;
-use tokio;
-
-use dotenv;
 
 use gpt_discord_bot::Handler;
 
@@ -26,7 +23,7 @@ async fn main() {
 
     // Create a new client with the discord token
     let mut client = Client::builder(&discord_token, intents)
-        .event_handler(Handler::new(gpt_api_key).await.unwrap())
+        .event_handler(Handler::new(&gpt_api_key).await.unwrap())
         .await
         .expect("Error creating client");
 
