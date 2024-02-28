@@ -1,3 +1,4 @@
+use gpt_discord_bot::ChatHandler;
 use serenity::prelude::*;
 use std::env;
 use std::path::Path;
@@ -23,9 +24,9 @@ async fn main() {
 
     // Create a new client with the discord token
     let mut client = Client::builder(&discord_token, intents)
-        .event_handler(Handler::new(&gpt_api_key).await.unwrap())
+        .event_handler(Handler::new(&gpt_api_key))
         .await
-        .expect("Error creating client");
+        .expect("Err creating client");
 
     // Start listening for events
     println!("Bot is now running. Press Ctrl+C to stop.");

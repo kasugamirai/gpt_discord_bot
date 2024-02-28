@@ -7,14 +7,15 @@ use tokio::select;
 use tokio::time::interval;
 
 // Define a trait representing handler behavior
+#[async_trait]
 pub trait ChatHandler {
     // Create a new instance of the handler
-    fn new(api_key: String) -> Result<Self>
+    fn new(api_key: &String) -> Self
     where
         Self: Sized;
 
     // Process an incoming message and return a response
-    fn process_message(&self, msg: Message) -> Option<String>;
+    async fn process_message(&self, msg: &Message) -> Option<String>;
 }
 
 // Handler struct implementing the ChatHandler trait
@@ -22,8 +23,9 @@ pub struct Handler {
     pub gpt_client: ChatGPT,
 }
 
-impl Handler {
-    pub async fn new(api_key: &String) -> Result<Self> {
+#[async_trait]
+impl ChatHandler for Handler {
+    fn new(api_key: &String) -> Self {
         let config: ModelConfiguration = ModelConfigurationBuilder::default()
             .engine(ChatGPTEngine::Gpt4)
             .timeout(Duration::from_secs(50))
@@ -32,11 +34,11 @@ impl Handler {
                 log::error!("Failed to build ModelConfiguration: {}", e);
                 ModelConfiguration::default()
             });
-        let gpt_client = ChatGPT::new_with_config(api_key, config)?;
-        Ok(Self { gpt_client })
+        let gpt_client = ChatGPT::new_with_config(api_key, config).unwrap();
+        Self { gpt_client }
     }
 
-    async fn process_message(&self, msg: Message) -> Option<String> {
+    async fn process_message(&self, msg: &Message) -> Option<String> {
         if msg.author.bot || !msg.content.starts_with(".") {
             return None;
         }
@@ -69,7 +71,7 @@ impl Handler {
 #[async_trait]
 impl SerenityEventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if let Some(result) = self.process_message(msg.clone()).await {
+        if let Some(result) = self.process_message(&msg).await {
             let processing_future = msg.channel_id.say(&ctx.http, "Processing...");
 
             match processing_future.await {
