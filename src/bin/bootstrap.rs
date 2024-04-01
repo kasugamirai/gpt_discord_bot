@@ -1,4 +1,3 @@
-use gpt_discord_bot::ChatHandler;
 use gpt_discord_bot::Handler;
 use serenity::all::GatewayIntents;
 use serenity::Client;
