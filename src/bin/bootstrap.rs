@@ -30,9 +30,15 @@ async fn main() {
     // Set the intents for the bot
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES;
 
+    let handler_result = Handler::new(&gpt_api_key);
+    let handler = match handler_result {
+        Ok(handler) => handler,
+        Err(e) => panic!("Error creating handler: {}", e),
+    };
+
     // Create a new client with the discord token
     let mut client = match Client::builder(&discord_token, intents)
-        .event_handler(Handler::new(&gpt_api_key))
+        .event_handler(handler)
         .await
     {
         Ok(client) => client,

@@ -1,4 +1,7 @@
-use chatgpt::prelude::*;
+use chatgpt::client::ChatGPT;
+use chatgpt::config::{ChatGPTEngine, ModelConfiguration, ModelConfigurationBuilder};
+use chatgpt::types::ResponseChunk;
+use core::fmt;
 use futures::StreamExt;
 use serenity::client::{Context, EventHandler as SerenityEventHandler};
 use serenity::{async_trait, builder::EditMessage, model::channel::Message};
@@ -6,11 +9,40 @@ use std::time::Duration;
 use tokio::select;
 use tokio::time::interval;
 
+#[derive(Debug)]
+pub enum Error {
+    ModelConfigurationBuilderError(chatgpt::config::ModelConfigurationBuilderError),
+    ChatGPT(chatgpt::err::Error),
+}
+
+impl From<chatgpt::config::ModelConfigurationBuilderError> for Error {
+    fn from(err: chatgpt::config::ModelConfigurationBuilderError) -> Self {
+        Error::ModelConfigurationBuilderError(err)
+    }
+}
+
+impl From<chatgpt::err::Error> for Error {
+    fn from(err: chatgpt::err::Error) -> Self {
+        Error::ChatGPT(err)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::ModelConfigurationBuilderError(err) => {
+                write!(f, "ModelConfigurationBuilderError: {}", err)
+            }
+            Error::ChatGPT(err) => write!(f, "ChatGPTError: {}", err),
+        }
+    }
+}
+
 // Define a trait representing handler behavior
 #[async_trait]
 pub trait ChatHandler {
     // Create a new instance of the handler
-    fn new(api_key: &String) -> Self
+    fn new(api_key: &String) -> Result<Self, Error>
     where
         Self: Sized;
 
@@ -25,17 +57,13 @@ pub struct Handler {
 
 #[async_trait]
 impl ChatHandler for Handler {
-    fn new(api_key: &String) -> Self {
+    fn new(api_key: &String) -> Result<Self, Error> {
         let config: ModelConfiguration = ModelConfigurationBuilder::default()
             .engine(ChatGPTEngine::Gpt4)
             .timeout(Duration::from_secs(50))
-            .build()
-            .unwrap_or_else(|e| {
-                log::error!("Failed to build ModelConfiguration: {}", e);
-                ModelConfiguration::default()
-            });
-        let gpt_client = ChatGPT::new_with_config(api_key, config).unwrap();
-        Self { gpt_client }
+            .build()?;
+        let gpt_client = ChatGPT::new_with_config(api_key, config)?;
+        Ok(Handler { gpt_client })
     }
 
     async fn process_message(&self, msg: &Message) -> Option<String> {
