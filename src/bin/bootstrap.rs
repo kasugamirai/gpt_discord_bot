@@ -11,22 +11,32 @@ async fn main() {
     env_logger::init();
     // Load environment variables from .env file
     if Path::new(".env").exists() {
-        dotenv::dotenv().expect("Failed to load .env file");
+        match dotenv::dotenv() {
+            Ok(_) => {}
+            Err(_) => println!("Failed to load .env file"),
+        }
     }
     // Get the discord token from the environment
-    let discord_token =
-        env::var("DISCORD_TOKEN").expect("Expected a discord token in the environment");
+    let discord_token = match env::var("DISCORD_TOKEN") {
+        Ok(val) => val,
+        Err(_) => panic!("Expected a discord token in the environment"),
+    };
     // Get the OpenAI API key from the environment
-    let gpt_api_key =
-        env::var("OPENAI_API_KEY").expect("Expected a OPEN AI key in the environment");
+    let gpt_api_key = match env::var("OPENAI_API_KEY") {
+        Ok(val) => val,
+        Err(_) => panic!("Expected a OPEN AI key in the environment"),
+    };
     // Set the intents for the bot
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES;
 
     // Create a new client with the discord token
-    let mut client = Client::builder(&discord_token, intents)
+    let mut client = match Client::builder(&discord_token, intents)
         .event_handler(Handler::new(&gpt_api_key))
         .await
-        .expect("Err creating client");
+    {
+        Ok(client) => client,
+        Err(_) => panic!("Err creating client"),
+    };
 
     // Start listening for events
     println!("Bot is now running. Press Ctrl+C to stop.");
