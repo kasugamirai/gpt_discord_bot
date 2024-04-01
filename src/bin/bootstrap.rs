@@ -48,7 +48,7 @@ fn load_environment_variables() {
     if Path::new(path).exists() {
         match dotenv::dotenv() {
             Ok(_) => {}
-            Err(_) => println!("Failed to load {} file", path),
+            Err(e) => println!("Failed to load {} file: {}", path, e),
         }
     }
 }
@@ -66,6 +66,6 @@ async fn create_client(discord_token: &str, intents: GatewayIntents, handler: Ha
         .await
     {
         Ok(client) => client,
-        Err(_) => panic!("Err creating client"),
+        Err(e) => panic!("Err creating client{}", e),
     }
 }

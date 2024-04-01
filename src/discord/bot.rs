@@ -2,8 +2,10 @@ use chatgpt::client::ChatGPT;
 use chatgpt::config::{ChatGPTEngine, ModelConfiguration, ModelConfigurationBuilder};
 use chatgpt::types::ResponseChunk;
 use futures::StreamExt;
+use serenity::async_trait;
+use serenity::builder::EditMessage;
 use serenity::client::{Context, EventHandler};
-use serenity::{async_trait, builder::EditMessage, model::channel::Message};
+use serenity::model::channel::Message;
 use std::fmt;
 use std::time::Duration;
 use tokio::time::interval;
@@ -40,7 +42,7 @@ impl fmt::Display for Error {
 fn init_gpt_client(api_key: &str) -> Result<ChatGPT, Error> {
     let config: ModelConfiguration = ModelConfigurationBuilder::default()
         .engine(ChatGPTEngine::Gpt4)
-        .timeout(Duration::from_secs(50))
+        .timeout(Duration::from_secs(500))
         .build()?;
 
     let client = ChatGPT::new_with_config(api_key, config)?;
@@ -60,71 +62,66 @@ impl Handler {
     }
 }
 
-use tokio::select;
-
 #[async_trait]
 impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.author.bot {
+    async fn message<'a>(&'a self, ctx: Context, msg: Message) {
+        if msg.author.bot || !msg.content.starts_with(".") {
             return;
         }
 
-        if msg.content.starts_with(".") {
-            let prompt = msg.content[1..].trim();
-            let future = self.gpt_client.send_message_streaming(prompt);
-            let mut stream = match future.await {
-                Ok(stream) => stream,
-                Err(e) => {
-                    log::error!("Error sending message to ChatGPT: {:?}", e);
-                    return;
-                }
-            };
+        let prompt = &msg.content[1..];
+        let mut stream = match self.gpt_client.send_message_streaming(prompt).await {
+            Ok(stream) => stream,
+            Err(e) => {
+                log::error!("Error sending message to ChatGPT: {:?}", e);
+                return;
+            }
+        };
 
-            let processing_message = match msg.channel_id.say(&ctx.http, "Processing...").await {
-                Ok(message) => message,
-                Err(why) => {
-                    log::error!("Error sending message: {:?}", why);
-                    return;
-                }
-            };
+        let processing_message = match msg.channel_id.say(&ctx.http, "Processing...").await {
+            Ok(message) => message,
+            Err(why) => {
+                log::error!("Error sending message: {:?}", why);
+                return;
+            }
+        };
 
-            let mut result = String::new();
-            let mut interval = interval(Duration::from_millis(900));
+        let mut result = String::new();
+        let mut interval = interval(Duration::from_millis(900));
 
-            loop {
-                select! {
-                    chunk = stream.next() => {
-                        if let Some(chunk) = chunk {
-                            match chunk {
-                                ResponseChunk::Content { delta, response_index: _ } => {
-                                    result.push_str(&delta);
-                                },
-                                _ => {}
-                            }
-                        } else {
-                            // Stream has ended, break the loop
-                            break;
+        loop {
+            tokio::select! {
+                chunk = stream.next() => {
+                    if let Some(chunk) = chunk {
+                        match chunk {
+                            ResponseChunk::Content { delta, response_index: _ } => {
+                                result.push_str(&delta);
+                            },
+                            _ => {}
                         }
-                    },
-                    _ = interval.tick() => {
-                        if !result.is_empty() {
-                            let edit = EditMessage::default().content(&result);
-                            if let Err(why) = msg.channel_id.edit_message(&ctx.http, processing_message.id, edit).await {
-                                log::error!("Error editing message: {:?}", why);
-                            }
+                    } else {
+                        // Stream has ended, break the loop
+                        break;
+                    }
+                },
+                _ = interval.tick() => {
+                    if !result.is_empty() {
+                        let edit = EditMessage::default().content(&result);
+                        if let Err(why) = msg.channel_id.edit_message(&ctx.http, processing_message.id, edit).await {
+                            log::error!("Error editing message: {:?}", why);
                         }
                     }
                 }
             }
+        }
 
-            // Ensure any remaining content is also sent
-            if !result.is_empty() {
-                let edit = EditMessage::default().content(&result);
-                let _ = msg
-                    .channel_id
-                    .edit_message(&ctx.http, processing_message.id, edit)
-                    .await;
-            }
+        // Ensure any remaining content is also sent
+        if !result.is_empty() {
+            let edit = EditMessage::default().content(&result);
+            let _ = msg
+                .channel_id
+                .edit_message(&ctx.http, processing_message.id, edit)
+                .await;
         }
     }
 }
