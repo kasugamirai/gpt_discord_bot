@@ -1,5 +1,6 @@
 use gpt_discord_bot::ChatHandler;
-use serenity::prelude::*;
+use serenity::all::GatewayIntents;
+use serenity::Client;
 use std::env;
 use std::path::Path;
 
