@@ -29,3 +29,12 @@ sh build.sh
 ```bash
 cd output && sh run.sh
 ```
+
+## example
+To interact with the bot, start your message with a period. For example:
+
+```
+.hello world
+```
+
+This will prompt the bot to respond. Enjoy chatting with your new AI-powered Discord bot!
