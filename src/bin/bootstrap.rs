@@ -7,6 +7,7 @@ use std::path::Path;
 #[tokio::main]
 async fn main() {
     // Initialize the logger
+
     env_logger::init();
 
     // Load environment variables

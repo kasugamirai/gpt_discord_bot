@@ -771,6 +771,7 @@ dependencies = [
  "log",
  "reqwest 0.12.2",
  "serenity",
+ "thiserror",
  "tokio",
  "url",
 ]
