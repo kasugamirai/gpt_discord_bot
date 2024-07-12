@@ -3,12 +3,12 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use std::env;
 use std::path::Path;
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
-    // Initialize the logger
-
-    env_logger::init();
+    // Initialize the logger with tracing
+    tracing_subscriber::fmt::init();
 
     // Load environment variables
     load_environment_variables();
@@ -37,9 +37,9 @@ async fn main() {
     .await;
 
     // Start listening for events
-    println!("Bot is now running. Press Ctrl+C to stop.");
+    info!("Bot is now running. Press Ctrl+C to stop.");
     if let Err(why) = client.start().await {
-        log::error!("Client error: {:?}", why);
+        error!("Client error: {:?}", why);
     }
 }
 
