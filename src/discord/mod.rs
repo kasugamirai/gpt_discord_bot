@@ -20,7 +20,9 @@ pub enum Error {
     ChatGPT(#[from] chatgpt::err::Error),
 }
 
-fn init_gpt_client(api_key: &str) -> Result<ChatGPT, Error> {
+type Result<T> = std::result::Result<T, Error>;
+
+fn init_gpt_client(api_key: &str) -> Result<ChatGPT> {
     let config: ModelConfiguration = ModelConfigurationBuilder::default()
         .engine(ChatGPTEngine::Gpt4)
         .timeout(Duration::from_secs(500))
@@ -36,7 +38,7 @@ pub struct Handler {
 }
 
 impl Handler {
-    pub fn new(api_key: &str) -> Result<Self, Error> {
+    pub fn new(api_key: &str) -> Result<Self> {
         let gpt_client = init_gpt_client(api_key)?;
         Ok(Self { gpt_client })
     }
@@ -44,8 +46,8 @@ impl Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn message<'a>(&'a self, ctx: Context, msg: Message) {
-        if msg.author.bot || !msg.content.starts_with('.') {
+    async fn message(&self, ctx: Context, msg: Message) {
+        if !filter_msg(&msg) {
             return;
         }
 
@@ -101,4 +103,11 @@ impl EventHandler for Handler {
                 .await;
         }
     }
+}
+
+fn filter_msg(msg: &Message) -> bool {
+    if msg.author.bot || !msg.content.starts_with('.') {
+        return false;
+    }
+    true
 }
