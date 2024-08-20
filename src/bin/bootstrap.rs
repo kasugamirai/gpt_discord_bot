@@ -1,8 +1,8 @@
+use gpt_discord_bot::create_client;
+use gpt_discord_bot::get_env;
+use gpt_discord_bot::load_environment_variables;
 use gpt_discord_bot::Handler;
 use serenity::all::GatewayIntents;
-use serenity::Client;
-use std::env;
-use std::path::Path;
 use tracing::{error, info};
 
 #[tokio::main]
@@ -40,33 +40,5 @@ async fn main() {
     info!("Bot is now running. Press Ctrl+C to stop.");
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
-    }
-}
-
-fn load_environment_variables() {
-    let path = ".env";
-    // Load environment variables from .env file
-    if Path::new(path).exists() {
-        match dotenv::dotenv() {
-            Ok(_) => {}
-            Err(e) => println!("Failed to load {} file: {}", path, e),
-        }
-    }
-}
-
-fn get_env(key: &str, error_message: &str) -> String {
-    match env::var(key) {
-        Ok(val) => val,
-        Err(_) => panic!("{}", error_message),
-    }
-}
-
-async fn create_client(discord_token: &str, intents: GatewayIntents, handler: Handler) -> Client {
-    match Client::builder(discord_token, intents)
-        .event_handler(handler)
-        .await
-    {
-        Ok(client) => client,
-        Err(e) => panic!("Err creating client{}", e),
     }
 }

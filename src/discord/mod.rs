@@ -6,6 +6,8 @@ use serenity::async_trait;
 use serenity::builder::EditMessage;
 use serenity::client::{Context, EventHandler};
 use serenity::model::channel::Message;
+use serenity::model::gateway::GatewayIntents;
+use serenity::Client;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::time::interval;
@@ -110,4 +112,18 @@ fn filter_msg(msg: &Message) -> bool {
         return false;
     }
     true
+}
+
+pub async fn create_client(
+    discord_token: &str,
+    intents: GatewayIntents,
+    handler: Handler,
+) -> Client {
+    match Client::builder(discord_token, intents)
+        .event_handler(handler)
+        .await
+    {
+        Ok(client) => client,
+        Err(e) => panic!("Err creating client{}", e),
+    }
 }
