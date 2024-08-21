@@ -8,10 +8,12 @@ use serenity::client::{Context, EventHandler};
 use serenity::model::channel::Message;
 use serenity::model::gateway::GatewayIntents;
 use serenity::Client;
+use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tokio::time::interval;
-use tracing::error;
+use tracing::{debug, error};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -54,7 +56,7 @@ impl EventHandler for Handler {
         }
 
         let prompt = &msg.content[1..];
-        let mut stream = match self.gpt_client.send_message_streaming(prompt).await {
+        let stream = match self.gpt_client.send_message_streaming(prompt).await {
             Ok(stream) => stream,
             Err(e) => {
                 error!("Error sending message to ChatGPT: {:?}", e);
@@ -70,31 +72,38 @@ impl EventHandler for Handler {
             }
         };
 
-        let mut result = String::new();
-        let mut interval = interval(Duration::from_millis(900));
+        let res: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+        let mut interval: tokio::time::Interval = interval(Duration::from_millis(900));
 
-        loop {
-            tokio::select! {
-                chunk = stream.next() => {
-                    if let Some(chunk) = chunk {
-                        if let ResponseChunk::Content { delta, response_index: _ } = chunk {
-                                result.push_str(&delta);
-                        }
-                    } else {
-                        // Stream has ended, break the loop
-                        break;
-                    }
-                },
-                _ = interval.tick() => {
-                    if !result.is_empty() {
-                        let edit = EditMessage::default().content(&result);
-                        if let Err(why) = msg.channel_id.edit_message(&ctx.http, processing_message.id, edit).await {
-                            error!("Error editing message: {:?}", why);
+        stream
+            .for_each(|each| {
+                let result: Arc<Mutex<String>> = res.clone();
+                {
+                    let value = ctx.http.clone();
+                    async move {
+                        if let ResponseChunk::Content {
+                            delta,
+                            response_index: _,
+                        } = each
+                        {
+                            debug!("{}", delta);
+                            let mut res_ref = result.lock().await;
+                            res_ref.push_str(&delta);
+                            let edit = EditMessage::default().content(res_ref.clone());
+                            if let Err(why) = msg
+                                .channel_id
+                                .edit_message(&value, processing_message.id, edit)
+                                .await
+                            {
+                                error!("Error editing message: {:?}", why);
+                            }
                         }
                     }
                 }
-            }
-        }
+            })
+            .await;
+
+        let result = res.lock().await.clone();
 
         // Ensure any remaining content is also sent
         if !result.is_empty() {
