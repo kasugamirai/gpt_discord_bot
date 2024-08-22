@@ -9,6 +9,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::GatewayIntents;
 use serenity::Client;
 use std::sync::Arc;
+use std::thread::spawn;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -73,13 +74,30 @@ impl EventHandler for Handler {
         };
 
         let res: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+        let res_clone = res.clone();
+        let http_clone = ctx.http.clone();
         let mut interval: tokio::time::Interval = interval(Duration::from_millis(900));
+
+        tokio::spawn(async move {
+            loop {
+                interval.tick().await;
+                let res = res_clone.lock().await.clone();
+                let edit = EditMessage::default().content(&res);
+                if let Err(why) = processing_message
+                    .channel_id
+                    .edit_message(&http_clone, processing_message.id, edit)
+                    .await
+                {
+                    error!("Error editing message: {:?}", why);
+                }
+            }
+        });
 
         stream
             .for_each(|each| {
                 let result: Arc<Mutex<String>> = res.clone();
                 {
-                    let value = ctx.http.clone();
+                    //let value = ctx.http.clone();
                     async move {
                         if let ResponseChunk::Content {
                             delta,
@@ -89,14 +107,6 @@ impl EventHandler for Handler {
                             debug!("{}", delta);
                             let mut res_ref = result.lock().await;
                             res_ref.push_str(&delta);
-                            let edit = EditMessage::default().content(res_ref.clone());
-                            if let Err(why) = msg
-                                .channel_id
-                                .edit_message(&value, processing_message.id, edit)
-                                .await
-                            {
-                                error!("Error editing message: {:?}", why);
-                            }
                         }
                     }
                 }
