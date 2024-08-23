@@ -27,7 +27,7 @@ async fn main() {
     };
 
     // Create a new client with the discord token
-    let mut client = create_client(
+    let client_result = create_client(
         &get_env(
             "DISCORD_TOKEN",
             "Expected a discord token in the environment",
@@ -36,6 +36,14 @@ async fn main() {
         handler,
     )
     .await;
+
+    let mut client = match client_result {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Error creating client: {}", e);
+            return;
+        }
+    };
 
     // Start listening for events
     info!("Bot is now running. Press Ctrl+C to stop.");

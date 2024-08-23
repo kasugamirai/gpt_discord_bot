@@ -18,9 +18,11 @@ use tracing::{debug, error};
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    ModelConfigurationBuilderError(#[from] chatgpt::config::ModelConfigurationBuilderError),
+    ModelConfigurationBuilder(#[from] chatgpt::config::ModelConfigurationBuilderError),
     #[error(transparent)]
     ChatGPT(#[from] chatgpt::err::Error),
+    #[error(transparent)]
+    Client(#[from] serenity::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -143,9 +145,9 @@ pub async fn create_client(
     discord_token: &str,
     intents: GatewayIntents,
     handler: Handler,
-) -> Client {
-    Client::builder(discord_token, intents)
+) -> Result<Client> {
+    let ret = Client::builder(discord_token, intents)
         .event_handler(handler)
-        .await
-        .expect("Error creating client")
+        .await?;
+    Ok(ret)
 }
