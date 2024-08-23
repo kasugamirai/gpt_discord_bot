@@ -130,7 +130,7 @@ async fn update_message_interval(
             .edit_message(
                 &http,
                 processing_message.id,
-                EditMessage::new().content(&content),
+                EditMessage::new().content(content),
             )
             .await
         {

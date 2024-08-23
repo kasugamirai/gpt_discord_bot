@@ -14,8 +14,9 @@ async fn main() {
     load_environment_variables();
 
     // Set the intents for the bot
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES;
-
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::DIRECT_MESSAGES;
     let handler_result = Handler::new(&get_env(
         "OPENAI_API_KEY",
         "Expected a OPEN AI key in the environment",
