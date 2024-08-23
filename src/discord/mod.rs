@@ -1,5 +1,5 @@
 use chatgpt::client::ChatGPT;
-use chatgpt::config::{ChatGPTEngine, ModelConfiguration, ModelConfigurationBuilder};
+use chatgpt::config::{ChatGPTEngine, ModelConfigurationBuilder};
 use chatgpt::types::ResponseChunk;
 use futures::StreamExt;
 use serenity::async_trait;
@@ -9,18 +9,16 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::GatewayIntents;
 use serenity::Client;
 use std::sync::Arc;
-use std::thread::spawn;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::Mutex;
-use tokio::time::interval;
+use tokio::time::{interval, Interval};
 use tracing::{debug, error};
 
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
     ModelConfigurationBuilderError(#[from] chatgpt::config::ModelConfigurationBuilderError),
-
     #[error(transparent)]
     ChatGPT(#[from] chatgpt::err::Error),
 }
@@ -28,18 +26,16 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 fn init_gpt_client(api_key: &str) -> Result<ChatGPT> {
-    let config: ModelConfiguration = ModelConfigurationBuilder::default()
+    let config = ModelConfigurationBuilder::default()
         .engine(ChatGPTEngine::Gpt4)
         .timeout(Duration::from_secs(500))
         .build()?;
 
-    let client = ChatGPT::new_with_config(api_key, config)?;
-    Ok(client)
+    ChatGPT::new_with_config(api_key, config).map_err(Error::from)
 }
 
-// The Handler struct is the event handler for the bot.
 pub struct Handler {
-    pub gpt_client: ChatGPT,
+    gpt_client: ChatGPT,
 }
 
 impl Handler {
@@ -52,7 +48,7 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if !filter_msg(&msg) {
+        if !should_process_message(&msg) {
             return;
         }
 
@@ -73,64 +69,74 @@ impl EventHandler for Handler {
             }
         };
 
-        let res: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
-        let res_clone = res.clone();
-        let http_clone = ctx.http.clone();
-        let mut interval: tokio::time::Interval = interval(Duration::from_millis(900));
+        let response_content = Arc::new(Mutex::new(String::new()));
+        let res_clone = Arc::clone(&response_content);
+        let http_clone = Arc::new(ctx.http.clone());
+        let interval = interval(Duration::from_millis(500));
 
-        tokio::spawn(async move {
-            loop {
-                interval.tick().await;
-                let res = res_clone.lock().await.clone();
-                let edit = EditMessage::default().content(&res);
-                if let Err(why) = processing_message
-                    .channel_id
-                    .edit_message(&http_clone, processing_message.id, edit)
-                    .await
-                {
-                    error!("Error editing message: {:?}", why);
-                }
-            }
-        });
+        tokio::spawn(update_message_interval(
+            Arc::clone(&http_clone),
+            processing_message.clone(),
+            Arc::clone(&res_clone),
+            interval,
+        ));
 
         stream
-            .for_each(|each| {
-                let result: Arc<Mutex<String>> = res.clone();
-                {
-                    //let value = ctx.http.clone();
-                    async move {
-                        if let ResponseChunk::Content {
-                            delta,
-                            response_index: _,
-                        } = each
-                        {
-                            debug!("{}", delta);
-                            let mut res_ref = result.lock().await;
-                            res_ref.push_str(&delta);
-                        }
+            .for_each(|chunk| {
+                let res_clone = Arc::clone(&res_clone);
+                async move {
+                    if let ResponseChunk::Content { delta, .. } = chunk {
+                        debug!("{}", delta);
+                        let mut response = res_clone.lock().await;
+                        response.push_str(&delta);
                     }
                 }
             })
             .await;
 
-        let result = res.lock().await.clone();
+        let final_content = response_content.lock().await.clone();
 
-        // Ensure any remaining content is also sent
-        if !result.is_empty() {
-            let edit = EditMessage::default().content(&result);
-            let _ = msg
+        if !final_content.is_empty() {
+            if let Err(why) = processing_message
                 .channel_id
-                .edit_message(&ctx.http, processing_message.id, edit)
-                .await;
+                .edit_message(
+                    &ctx.http,
+                    processing_message.id,
+                    EditMessage::new().content(&final_content),
+                )
+                .await
+            {
+                error!("Error editing final message: {:?}", why);
+            }
         }
     }
 }
 
-fn filter_msg(msg: &Message) -> bool {
-    if msg.author.bot || !msg.content.starts_with('.') {
-        return false;
+fn should_process_message(msg: &Message) -> bool {
+    !msg.author.bot && msg.content.starts_with('.')
+}
+
+async fn update_message_interval(
+    http: Arc<serenity::http::Http>,
+    processing_message: Message,
+    res_clone: Arc<Mutex<String>>,
+    mut interval: Interval,
+) {
+    loop {
+        interval.tick().await;
+        let content = res_clone.lock().await.clone();
+        if let Err(why) = processing_message
+            .channel_id
+            .edit_message(
+                &http,
+                processing_message.id,
+                EditMessage::new().content(&content),
+            )
+            .await
+        {
+            error!("Error editing message: {:?}", why);
+        }
     }
-    true
 }
 
 pub async fn create_client(
@@ -138,11 +144,8 @@ pub async fn create_client(
     intents: GatewayIntents,
     handler: Handler,
 ) -> Client {
-    match Client::builder(discord_token, intents)
+    Client::builder(discord_token, intents)
         .event_handler(handler)
         .await
-    {
-        Ok(client) => client,
-        Err(e) => panic!("Err creating client{}", e),
-    }
+        .expect("Error creating client")
 }
