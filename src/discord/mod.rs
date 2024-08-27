@@ -1,3 +1,7 @@
+mod error;
+
+pub use error::Error;
+
 use chatgpt::client::ChatGPT;
 use chatgpt::config::{ChatGPTEngine, ModelConfigurationBuilder};
 use chatgpt::types::ResponseChunk;
@@ -10,20 +14,9 @@ use serenity::model::gateway::GatewayIntents;
 use serenity::Client;
 use std::sync::Arc;
 use std::time::Duration;
-use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::time::{interval, Interval};
 use tracing::{debug, error};
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    ModelConfigurationBuilder(#[from] chatgpt::config::ModelConfigurationBuilderError),
-    #[error(transparent)]
-    ChatGPT(#[from] chatgpt::err::Error),
-    #[error(transparent)]
-    Client(#[from] serenity::Error),
-}
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -114,10 +107,12 @@ impl EventHandler for Handler {
     }
 }
 
+#[inline]
 fn should_process_message(msg: &Message) -> bool {
     !msg.author.bot && msg.content.starts_with('.')
 }
 
+#[inline]
 async fn update_message_interval(
     http: Arc<serenity::http::Http>,
     processing_message: Message,
